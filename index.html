@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>LeadFlow</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@500;600;700&display=swap">
+<style>
+/* Layout: sticky top bar (brand, save status, viewer, add buttons), five tabs, Desk opens first. Lead details in a right drawer; stage change, message sending and voice fill in a centred dialog. */
+:root{
+  --bg:#F3F5FA; --surface:#FFFFFF; --surface-2:#E9EDF7; --line:#D5DBEA;
+  --fg:#14203A; --muted:#58657F;
+  --accent:#2D4BD6; --accent-fg:#FFFFFF; --accent-soft:#E1E7FB;
+  --over:#B3261E; --over-soft:#FBE3E1;
+  --today:#8A4B00; --today-soft:#FDE9C8;
+  --ok:#1B6B3A; --ok-soft:#DAF0E1;
+  --scrim:rgba(10,16,34,.55);
+  --f-body:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --f-head:'Sora','Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C1121; --surface:#141B30; --surface-2:#1C2540; --line:#2C3658;
+    --fg:#E8ECF8; --muted:#97A3C2;
+    --accent:#8EA2FF; --accent-fg:#0B1330; --accent-soft:#222E5E;
+    --over:#FF9189; --over-soft:#451F22;
+    --today:#F5C26B; --today-soft:#3B2C10;
+    --ok:#7BD59B; --ok-soft:#163726;
+    --scrim:rgba(0,0,0,.65); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C1121; --surface:#141B30; --surface-2:#1C2540; --line:#2C3658;
+  --fg:#E8ECF8; --muted:#97A3C2;
+  --accent:#8EA2FF; --accent-fg:#0B1330; --accent-soft:#222E5E;
+  --over:#FF9189; --over-soft:#451F22;
+  --today:#F5C26B; --today-soft:#3B2C10;
+  --ok:#7BD59B; --ok-soft:#163726;
+  --scrim:rgba(0,0,0,.65); color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--f-body)}
+.wrap{max-width:1180px;margin:0 auto;padding-block:18px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-head);margin:0;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.muted{color:var(--muted)} .num{font-variant-numeric:tabular-nums}
+.top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+.brand h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.chip.synced::before{background:var(--ok)} .chip.local::before,.chip.slow::before{background:var(--today)} .chip.error::before{background:var(--over)}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 13px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:500;font-size:13px;text-decoration:none;color:var(--fg);line-height:1.2}
+.btn:hover{background:var(--surface-2)} .btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)} .btn.primary:hover{filter:brightness(1.08)}
+.btn.sm{padding:5px 9px;font-size:12px} .btn.danger{color:var(--over)} .btn.armed{background:var(--over);border-color:var(--over);color:#fff}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:14px;overflow-x:auto}
+.tab{padding:10px 14px;border:0;background:none;color:var(--muted);font-weight:500;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-current="page"]{color:var(--fg);border-bottom-color:var(--accent)}
+.tab .count{margin-left:6px;font-size:12px;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.tab .count.alert{background:var(--over-soft);color:var(--over)}
+main{padding-top:18px}
+.pad{padding:24px 0}
+.notice{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;background:var(--accent-soft);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px}
+.notice.warn{background:var(--today-soft);color:var(--today)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:22px}
+.stat{background:var(--surface);padding:12px 16px}
+.stat:last-child:nth-child(odd){grid-column:1/-1}
+.stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.stat .v{font:600 24px/1.2 var(--f-head);font-variant-numeric:tabular-nums;margin-top:2px}
+.stat .v.alert{color:var(--over)}
+.group{margin-bottom:22px}
+.group h2{font:600 12px var(--f-body);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.group h2 .n{background:var(--surface-2);border-radius:999px;padding:0 8px}
+.group.over h2{color:var(--over)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer}
+.row:hover{border-color:var(--accent)}
+.who{min-width:0} .nm{overflow-wrap:anywhere}
+.meta{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:12px;color:var(--muted);margin-top:3px}
+.step{font-size:13px;margin-top:5px;overflow-wrap:anywhere}
+.step b{font-weight:600}
+.act{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.btns{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-items:center}
+.sn{font-size:11px;color:var(--muted)}
+@media (max-width:700px){.row{grid-template-columns:minmax(0,1fr)}.act{align-items:flex-start}.btns{justify-content:flex-start}}
+.allclear{background:var(--ok-soft);color:var(--ok);border-radius:10px;padding:14px 16px;margin-bottom:22px;font-weight:500}
+.due{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+.due.over{background:var(--over-soft);color:var(--over)} .due.today{background:var(--today-soft);color:var(--today)}
+.due.soon{background:var(--surface-2)} .due.none{border:1px dashed var(--line);color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:6px;font-size:12px;font-weight:500;background:var(--accent-soft);color:var(--accent)}
+.pill.s-new{background:var(--surface-2);color:var(--muted)} .pill.s-won{background:var(--ok-soft);color:var(--ok)} .pill.s-lost{background:var(--surface-2);color:var(--muted);text-decoration:line-through}
+.pill.s-meeting{background:var(--today-soft);color:var(--today)}
+.tag{font-size:11px;padding:0 6px;border:1px solid var(--line);border-radius:4px;color:var(--muted)}
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px,1fr);gap:12px;overflow-x:auto;padding-bottom:10px}
+.col{background:var(--surface-2);border-radius:10px;padding:10px;min-height:220px;min-width:0}
+.col.drop{outline:2px dashed var(--accent);outline-offset:-2px}
+.col h3{font:600 14px var(--f-head);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.col .tot{font:400 12px var(--f-body);color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;cursor:grab}
+.card:hover{border-color:var(--accent)}
+.card .co{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.cardft{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0;font-size:13px}
+.mv{width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:12px}
+.dropnote{font-size:12px;color:var(--muted);margin-top:10px;text-align:center}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.bar input[type=search]{flex:1 1 240px;min-width:0}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.bar select{width:auto}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:500;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top} tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--surface-2)} .r{text-align:right}
+.empty{border:1px dashed var(--line);border-radius:12px;padding:40px 20px;text-align:center;background:var(--surface)}
+.empty h2{font-size:20px;margin-bottom:6px} .empty p{max-width:50ch;margin:0 auto 18px;color:var(--muted)}
+.empty .btns{justify-content:center}
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--surface);z-index:41;overflow-y:auto;border-left:1px solid var(--line);box-shadow:-8px 0 32px rgba(0,0,0,.18);padding-top:calc(18px + env(safe-area-inset-top,0px));padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));padding-left:18px;padding-right:max(18px,env(safe-area-inset-right,0px))}
+.modal{position:fixed;z-index:52;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100% - 24px));max-height:calc(100% - 24px);overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.scrim.top{z-index:51}
+.dh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}
+.dh h2{font-size:20px;overflow-wrap:anywhere}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}}
+.grid2>div,.fld{min-width:0}
+.fld{margin-bottom:12px}
+label{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:4px}
+textarea{resize:vertical;min-height:70px}
+.dfoot{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px;align-items:center}
+.spacer{flex:1}
+.logbox{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+.logbox h3{font-size:15px;margin-bottom:10px}
+.tl{list-style:none;padding:0;margin:16px 0 0;display:grid;gap:12px}
+.tl li{display:grid;grid-template-columns:76px minmax(0,1fr);gap:10px;font-size:13px}
+.tl .ty{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);padding-top:2px}
+.tl li.sys .ty,.tl li.sys .tx{color:var(--muted)} .tl .tx{overflow-wrap:anywhere} .tl .when{font-size:12px;color:var(--muted)}
+.seg{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.seg button{padding:6px 12px;border:1px solid var(--line);background:var(--surface);border-radius:999px;cursor:pointer;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.panel h3{font-size:15px;margin-bottom:10px}
+.bars{display:grid;gap:8px}
+.bl{display:grid;grid-template-columns:110px minmax(0,1fr) 44px;gap:8px;align-items:center;font-size:13px}
+.bl .t{height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bl .t i{display:block;height:100%;background:var(--accent);border-radius:6px}
+.bl.won .t i{background:var(--ok)}
+.rules{padding-left:18px;margin:0 0 12px} .rules li{margin-bottom:4px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:70;max-width:calc(100% - 32px);font-size:13px}
+.me{font-size:12px;color:var(--muted)}
+@media (max-width:640px){input,select,textarea,.mv{font-size:16px}}
+@media (prefers-reduced-motion:no-preference){.row,.card,.btn{transition:border-color .12s,background-color .12s}}
+</style>
+
+<style>[hidden]{display:none!important}body{margin:0}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>LeadFlow</h1><span id="status" class="chip">Connecting</span><span id="me" class="me"></span></div>
+    <div class="acts">
+      <button class="btn" id="btn-export" data-act="export" type="button" hidden>Export CSV</button>
+      <button class="btn" data-act="smart" type="button">Speak or paste details</button>
+      <button class="btn" data-act="scan" type="button">Scan card / photo</button>
+      <button class="btn primary" data-act="add" type="button">Add lead</button>
+    </div>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="Views">
+    <button class="tab" data-view="desk" type="button">Desk <span class="count" id="c-desk">0</span></button>
+    <button class="tab" data-view="pipeline" type="button">Pipeline</button>
+    <button class="tab" data-view="leads" type="button">All leads <span class="count" id="c-all">0</span></button>
+    <button class="tab" data-view="dashboard" type="button">Dashboard</button>
+    <button class="tab" data-view="automation" type="button">Automation</button>
+  </nav>
+  <main id="main"><p class="muted pad">Loading leads…</p></main>
+</div>
+<div id="scrim" class="scrim" hidden></div>
+<aside id="drawer" class="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="dtitle" tabindex="-1"></aside>
+<div id="scrim2" class="scrim top" hidden></div>
+<div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mtitle" tabindex="-1"></div>
+<div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s,r){return (r||document).querySelector(s);};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+/* ---------- constants ---------- */
+var STAGES=[{id:'new',label:'New lead'},{id:'contacted',label:'Contacted'},{id:'meeting',label:'Meeting'},{id:'proposal',label:'Proposal sent'},{id:'followup',label:'Follow-up'},{id:'won',label:'Won'},{id:'lost',label:'Lost'}];
+var OPEN=['new','contacted','meeting','proposal','followup'];
+var SOURCES=['Reference','Website','WhatsApp','Instagram','Cold call','JustDial','IndiaMART','Walk-in','Other'];
+var ACT_TYPES=[['call','Call'],['whatsapp','WhatsApp'],['sms','SMS'],['email','Email'],['meeting','Meeting'],['note','Note']];
+var OUTCOMES=[['interested','Spoke, interested'],['time','Spoke, needs time'],['noreply','No response'],['notint','Not interested']];
+var LOST_REASONS=['Price too high','No response','Chose someone else','No longer needed','Other'];
+var ACTION={new:'Call and introduce yourself',contacted:'Share details and fix a meeting',meeting:'Confirm and hold the meeting',proposal:'Follow up on the proposal',followup:'Ask for a decision'};
+var DEFAULT_CFG={
+  business:'our company',me:'',maxAttempts:3,
+  gaps:{new:1,contacted:2,meeting:1,proposal:5,followup:3},
+  templates:{
+    new:'Hi {name}, thank you for contacting {business}. I am {me}. Could we speak briefly about your {requirement}? Please tell me a good time to call.',
+    contacted:'Hi {name}, it was good speaking with you. Sharing the details about {requirement} as discussed. Shall we fix a meeting this week?',
+    meeting:'Hi {name}, confirming our meeting {meeting}. Please let me know if the time needs to change. Regards, {me}, {business}',
+    proposal:'Hi {name}, following up on the proposal we sent for {requirement}. Do you have any questions I can help with? Regards, {me}, {business}',
+    followup:'Hi {name}, checking in on the proposal for {requirement}. Could you share your decision or any changes you would like? Regards, {me}, {business}'
+  },
+  subject:'{business}: your {requirement} enquiry'
+};
+var LS='leadflow.v1';
+
+var leads=[],cfg=clone(DEFAULT_CFG),loaded=false,backend='local',col=null,cfgDoc=null,view='desk';
+var drawerId,modal=null,canWrite=null,isAdmin=false,me={id:null,name:''},userCap=null,dl=null,dict=null,sampler=null;
+var gotServer=false,loadTimer=null,lastFocus=null,delTimer=null,toastTimer=null,f={q:'',stage:'',source:'',sort:'due'};
+
+/* ---------- helpers ---------- */
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function pad(n){return String(n).padStart(2,'0');}
+function ymd(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function today(){return ymd(new Date());}
+function addDays(s,n){var p=s.split('-').map(Number);return ymd(new Date(p[0],p[1]-1,p[2]+n));}
+function diffDays(a,b){var x=a.split('-').map(Number),y=b.split('-').map(Number);return Math.round((Date.UTC(x[0],x[1]-1,x[2])-Date.UTC(y[0],y[1]-1,y[2]))/864e5);}
+function fmtDate(s){if(!s)return '';var p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]).toLocaleDateString('en-IN',{day:'numeric',month:'short'});}
+function fmtStamp(iso){var d=new Date(iso);return d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+', '+d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'});}
+function fmtMeet(s){if(!s)return '';var d=new Date(s);return isNaN(d)?s:d.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})+' at '+d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'});}
+function rel(iso){var n=diffDays(today(),ymd(new Date(iso)));if(n<=0)return 'today';if(n===1)return 'yesterday';if(n<30)return n+' days ago';return fmtDate(ymd(new Date(iso)));}
+function trimNum(x){return String(Math.round(x*100)/100);}
+function inr(n){n=Number(n)||0;if(n>=1e7)return '₹'+trimNum(n/1e7)+' Cr';if(n>=1e5)return '₹'+trimNum(n/1e5)+' L';return '₹'+n.toLocaleString('en-IN');}
+function lbl(id){for(var i=0;i<STAGES.length;i++)if(STAGES[i].id===id)return STAGES[i].label;return id;}
+function isOpen(l){return OPEN.indexOf(l.stage)>=0;}
+function mkId(){return 'l'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function lastAct(l){var a=(l.activity||[]).filter(function(x){return x.type!=='system';});return a.length?a[a.length-1]:null;}
+function dueInfo(l){
+  if(!l.next)return {k:'none',label:'No date'};
+  var d=diffDays(l.next,today());
+  if(d<0){var n=-d;return {k:'over',label:n+(n===1?' day':' days')+' overdue'};}
+  if(d===0)return {k:'today',label:'Today'};
+  if(d===1)return {k:'soon',label:'Tomorrow'};
+  return {k:'soon',label:fmtDate(l.next)};
+}
+function phoneDigits(p){
+  var d=String(p||'').replace(/\D/g,'');
+  if(d.length===11&&d.charAt(0)==='0')d=d.slice(1);
+  if(d.length===10)d='91'+d;
+  return d.length>=11?d:'';
+}
+function stagePill(s){return '<span class="pill s-'+esc(s)+'">'+esc(lbl(s))+'</span>';}
+function toast(msg){var t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.hidden=true;},3600);}
+function errMsg(e){return e&&e.code==='invalid_argument'?"Couldn't save. You may have view-only access to this page.":"Couldn't save. Check your connection and try again.";}
+function sys(text){return {t:new Date().toISOString(),type:'system',text:text,by:me.id||''};}
+function fillTpl(t,l){
+  var map={name:(l.name||'').split(' ')[0]||'there',company:l.company||'your company',requirement:l.requirement||'requirement',me:cfg.me||me.name||'our team',business:cfg.business||'our company',meeting:l.meetingAt?fmtMeet(l.meetingAt):'at the agreed time'};
+  return String(t||'').replace(/\{(\w+)\}/g,function(m,k){return map[k]!=null?map[k]:m;});
+}
+
+/* ---------- storage ---------- */
+function persistLocal(){try{localStorage.setItem(LS,JSON.stringify(leads));}catch(e){}}
+function loadLocal(){try{var r=localStorage.getItem(LS);if(r)return JSON.parse(r);}catch(e){}return [];}
+var chain={};
+function queue(id,fn){chain[id]=(chain[id]||Promise.resolve()).catch(function(){}).then(fn);return chain[id];}
+function saveLead(l,quiet){
+  l.updated=new Date().toISOString();
+  var i=leads.findIndex(function(x){return x.id===l.id;});
+  if(i>=0)leads[i]=l;else leads.unshift(l);
+  var p;
+  if(backend==='db'){p=queue(l.id,function(){return col.doc(l.id).set(clone(l));}).catch(function(e){toast(errMsg(e));});}
+  else{persistLocal();p=Promise.resolve();}
+  if(!quiet)render();
+  return p;
+}
+function removeLead(id){
+  leads=leads.filter(function(x){return x.id!==id;});
+  if(backend==='db')return queue(id,function(){return col.doc(id).delete();}).catch(function(e){toast(errMsg(e));});
+  persistLocal();return Promise.resolve();
+}
+function saveCfg(c){
+  cfg=c;
+  if(backend==='db'){return queue('cfg',function(){return cfgDoc.set(clone(c));}).then(function(){toast('Automation rules saved.');}).catch(function(e){toast(errMsg(e));});}
+  try{localStorage.setItem(LS+'.cfg',JSON.stringify(c));}catch(x){}
+  toast('Automation rules saved.');return Promise.resolve();
+}
+function mergeCfg(d){
+  var c=clone(DEFAULT_CFG);d=d||{};
+  ['business','me','subject'].forEach(function(k){if(typeof d[k]==='string'&&d[k])c[k]=d[k];});
+  if(Number(d.maxAttempts)>0)c.maxAttempts=Number(d.maxAttempts);
+  if(d.gaps)Object.keys(c.gaps).forEach(function(k){if(Number(d.gaps[k])>=0&&d.gaps[k]!=='')c.gaps[k]=Number(d.gaps[k]);});
+  if(d.templates)Object.keys(c.templates).forEach(function(k){if(typeof d.templates[k]==='string'&&d.templates[k])c.templates[k]=d.templates[k];});
+  return c;
+}
+function setStatus(k){
+  var m={loading:'Connecting',synced:'Saved to your account',local:'Saved in this browser only',slow:'Storage is slow to respond',error:"Can't reach storage"};
+  var el=$('#status');el.className='chip '+k;el.textContent=m[k]||'';
+}
+function initStore(){
+  var C=window.claude&&window.claude.use?window.claude:null;
+  function use(n){return C?C.use(n).catch(function(){return null;}):Promise.resolve(null);}
+  Promise.all([use('db'),use('user'),use('downloads'),use('dictation'),use('sample')]).then(function(r){
+    var db=r[0];userCap=r[1];dl=r[2];dict=r[3];sampler=r[4];
+    if(userCap){
+      userCap.me().then(function(v){me={id:v.id,name:v.name||''};$('#me').textContent=v.name?'Signed in as '+v.name:'';render();}).catch(function(){});
+      userCap.canEdit().then(function(v){isAdmin=!!v;if(view==='automation')render();}).catch(function(){});
+      if(userCap.can)userCap.can('data.write').then(function(v){canWrite=v;render();}).catch(function(){});
+    }
+    if(db){
+      backend='db';col=db.collection('leads');cfgDoc=db.doc('config/automation');setStatus('loading');
+      loadTimer=setTimeout(function(){if(!gotServer){setStatus('slow');loaded=true;render();}},10000);
+      col.onSnapshot(function(snap){
+        if(snap.metadata.fromCache&&snap.empty&&!gotServer)return;
+        leads=snap.docs.map(function(d){var o=Object.assign({},d.data());o.id=d.id;return o;});
+        loaded=true;
+        if(!snap.metadata.fromCache){gotServer=true;clearTimeout(loadTimer);setStatus('synced');}
+        render();
+      },function(){clearTimeout(loadTimer);loaded=true;setStatus('error');render();});
+      cfgDoc.onSnapshot(function(s){cfg=mergeCfg(s.exists?s.data():null);render();},function(){});
+    }else{
+      backend='local';leads=loadLocal();
+      try{var c=localStorage.getItem(LS+'.cfg');if(c)cfg=mergeCfg(JSON.parse(c));}catch(e){}
+      isAdmin=true;loaded=true;setStatus('local');render();
+    }
+  });
+}
+
+/* ---------- automation rules ---------- */
+function gapFor(stage){return cfg.gaps[stage]!=null?cfg.gaps[stage]:3;}
+function stageMessage(l){return fillTpl(cfg.templates[l.stage]||cfg.templates.followup,l);}
+function applyStage(l,stage,o){
+  o=o||{};
+  var n=Object.assign({},l,{stage:stage,attempts:0});
+  n.activity=(l.activity||[]).concat([sys('Stage: '+lbl(l.stage)+' to '+lbl(stage))]);
+  if(stage==='won'||stage==='lost'){
+    n.next='';n.closed=today();
+    if(stage==='won'&&o.value)n.value=Number(o.value)||n.value;
+    if(stage==='lost'){n.lostReason=o.reason||'';n.activity.push(sys('Lost reason: '+(o.reason||'not given')+(o.note?'. '+o.note:'')));}
+  }else{
+    n.closed='';
+    if(stage==='meeting'&&o.meetingAt){n.meetingAt=o.meetingAt;n.next=o.meetingAt.slice(0,10);n.activity.push(sys('Meeting set for '+fmtMeet(o.meetingAt)));}
+    else if(o.days==='none'){n.next='';}
+    else{var d=o.days!=null?Number(o.days):gapFor(stage);n.next=addDays(today(),d);n.activity.push(sys('Auto: follow-up set for '+fmtDate(n.next)+(o.days==null?' (rule: '+d+' days after '+lbl(stage)+')':'')));}
+  }
+  return n;
+}
+function snooze(id,days){
+  var l=leads.find(function(x){return x.id===id;});if(!l)return;
+  var n=Object.assign({},l,{next:addDays(today(),days)});
+  n.activity=(l.activity||[]).concat([sys('Follow-up moved to '+fmtDate(n.next))]);
+  saveLead(n);toast('Follow-up moved to '+fmtDate(n.next)+'.');
+}
+
+/* ---------- views ---------- */
+function byNext(a,b){return (a.next||'9999').localeCompare(b.next||'9999')||(a.name||'').localeCompare(b.name||'');}
+function render(){
+  var t=today(),open=leads.filter(isOpen);
+  var due=open.filter(function(l){return l.next&&l.next<=t;}).length;
+  var c=$('#c-desk');c.textContent=due;c.className='count'+(due?' alert':'');
+  $('#c-all').textContent=leads.length;
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'),function(b){if(b.dataset.view===view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+  $('#btn-export').hidden=!leads.length;
+  var m=$('#main');
+  if(!loaded){m.innerHTML='<p class="muted pad">Loading leads…</p>';return;}
+  if(view==='automation'){m.dataset.view='automation';if(!m.querySelector('#cfgform')||m.dataset.dirty!=='1')m.innerHTML=automationHtml();return;}
+  var warn='';
+  if(canWrite===false)warn='<div class="notice warn"><span>You have view-only access, so leads are hidden. Ask the owner for Contributor access.</span></div>';
+  if(!leads.length){m.dataset.view='empty';m.innerHTML=warn+emptyHtml();return;}
+  var notice=leads.some(function(l){return l.sample;})?'<div class="notice"><span>Sample leads are showing so you can try the tool.</span><button class="btn sm" data-act="rmsamples" type="button">Remove samples</button></div>':'';
+  if(view==='desk'&&cfg.business===DEFAULT_CFG.business&&canWrite!==false)notice+='<div class="notice"><span>Messages use a placeholder business name. Set your name and business so they read properly.</span><button class="btn sm" data-act="goauto" type="button">Open Automation</button></div>';
+  if(view==='leads'&&m.dataset.view==='leads'&&$('#q')){updateTable();return;}
+  m.dataset.view=view;
+  if(view==='desk')m.innerHTML=warn+notice+deskHtml();
+  else if(view==='pipeline')m.innerHTML=notice+boardHtml();
+  else if(view==='dashboard')m.innerHTML=notice+dashHtml();
+  else{m.innerHTML=notice+allShell();updateTable();}
+}
+function emptyHtml(){
+  return '<div class="empty"><h2>No leads yet</h2><p>Add a lead, or speak or paste the details and let Claude fill the form. LeadFlow then plans the follow-ups for you.</p><div class="btns"><button class="btn primary" data-act="add" type="button">Add a lead</button><button class="btn" data-act="smart" type="button">Speak or paste details</button><button class="btn" data-act="samples" type="button">Load 8 sample leads</button></div></div>';
+}
+function rowHtml(l){
+  var di=dueInfo(l),last=lastAct(l);
+  return '<article class="row" tabindex="0" data-open="'+l.id+'"><div class="who"><div class="nm"><strong>'+esc(l.name)+'</strong>'+(l.company?' <span class="muted">· '+esc(l.company)+'</span>':'')+(l.sample?' <span class="tag">Sample</span>':'')+'</div>'+
+  '<div class="meta">'+stagePill(l.stage)+(l.requirement?'<span>'+esc(l.requirement)+'</span>':'')+(l.source?'<span>'+esc(l.source)+(l.referredBy?' ('+esc(l.referredBy)+')':'')+'</span>':'')+(l.value?'<span class="num">'+inr(l.value)+'</span>':'')+'</div>'+
+  '<div class="step"><b>Next:</b> '+esc(ACTION[l.stage]||'')+(l.stage==='meeting'&&l.meetingAt?' <span class="muted">('+esc(fmtMeet(l.meetingAt))+')</span>':'')+(last?' <span class="muted">· last: '+esc(last.text)+', '+rel(last.t)+'</span>':'')+'</div></div>'+
+  '<div class="act"><span class="due '+di.k+'">'+esc(di.label)+'</span><div class="btns">'+
+  '<button class="btn sm primary" data-act="send" data-id="'+l.id+'" type="button">Message</button>'+
+  '<button class="btn sm" data-act="log" data-id="'+l.id+'" type="button">Log</button><span class="sn">Snooze</span>'+
+  [[1,'1d'],[3,'3d'],[7,'1w']].map(function(x){return '<button class="btn sm" data-act="snooze" data-id="'+l.id+'" data-days="'+x[0]+'" type="button" aria-label="Snooze '+x[1]+'">'+x[1]+'</button>';}).join('')+
+  '</div></div></article>';
+}
+function deskHtml(){
+  var t=today(),wk=addDays(t,7),open=leads.filter(isOpen);
+  var over=open.filter(function(l){return l.next&&l.next<t;}).sort(byNext),due=open.filter(function(l){return l.next===t;}).sort(byNext);
+  var week=open.filter(function(l){return l.next>t&&l.next<=wk;}).sort(byNext),later=open.filter(function(l){return l.next>wk;}).sort(byNext),none=open.filter(function(l){return !l.next;}).sort(byNext);
+  var fresh=open.filter(function(l){return l.stage==='new';}).length;
+  var h='<div class="stats"><div class="stat"><div class="k">Overdue</div><div class="v'+(over.length?' alert':'')+'">'+over.length+'</div></div><div class="stat"><div class="k">Due today</div><div class="v">'+due.length+'</div></div><div class="stat"><div class="k">Next 7 days</div><div class="v">'+week.length+'</div></div><div class="stat"><div class="k">New, not contacted</div><div class="v">'+fresh+'</div></div><div class="stat"><div class="k">Open leads</div><div class="v">'+open.length+'</div></div></div>';
+  if(!over.length&&!due.length)h+='<div class="allclear">Nothing is due today. Use the time to follow up on the leads below.</div>';
+  [['Overdue',over,'over'],['Due today',due,''],['Next 7 days',week,''],['Later',later,''],['No follow-up date',none,'']].forEach(function(g){
+    if(g[1].length)h+='<section class="group '+g[2]+'"><h2>'+g[0]+' <span class="n">'+g[1].length+'</span></h2>'+g[1].map(rowHtml).join('')+'</section>';
+  });
+  return h;
+}
+function boardHtml(){
+  var h='<div class="board">';
+  STAGES.forEach(function(s){
+    var items=leads.filter(function(l){return l.stage===s.id;}).sort(byNext),tot=items.reduce(function(a,l){return a+(Number(l.value)||0);},0);
+    h+='<div class="col" data-stage="'+s.id+'"><h3><span>'+s.label+' <span class="muted">'+items.length+'</span></span><span class="tot">'+(tot?inr(tot):'')+'</span></h3>';
+    items.forEach(function(l){var di=dueInfo(l);
+      h+='<div class="card" tabindex="0" draggable="true" data-open="'+l.id+'" data-id="'+l.id+'"><div class="nm"><strong>'+esc(l.name)+'</strong>'+(l.sample?' <span class="tag">Sample</span>':'')+'</div>'+(l.company?'<div class="co">'+esc(l.company)+'</div>':'')+
+      '<div class="cardft"><span class="num">'+(l.value?inr(l.value):'')+'</span>'+(isOpen(l)?'<span class="due '+di.k+'">'+esc(di.label)+'</span>':'')+'</div>'+
+      '<select class="mv" data-move="'+l.id+'" aria-label="Move '+esc(l.name)+' to stage">'+STAGES.map(function(x){return '<option value="'+x.id+'"'+(x.id===l.stage?' selected':'')+'>'+x.label+'</option>';}).join('')+'</select></div>';});
+    if(!items.length)h+='<div class="dropnote">Drop a card here</div>';
+    h+='</div>';
+  });
+  return h+'</div>';
+}
+function allShell(){
+  return '<div class="bar"><input id="q" type="search" placeholder="Search name, company, phone, requirement" aria-label="Search leads" value="'+esc(f.q)+'">'+
+  '<select id="fs" aria-label="Filter by stage"><option value="">All stages</option>'+STAGES.map(function(s){return '<option value="'+s.id+'"'+(f.stage===s.id?' selected':'')+'>'+s.label+'</option>';}).join('')+'</select>'+
+  '<select id="fsrc" aria-label="Filter by source"><option value="">All sources</option>'+SOURCES.map(function(s){return '<option'+(f.source===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
+  '<select id="fsort" aria-label="Sort leads">'+[['due','Next follow-up'],['new','Newest first'],['value','Highest value'],['name','Name A to Z']].map(function(o){return '<option value="'+o[0]+'"'+(f.sort===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div><div id="alltbl"></div>';
+}
+function filtered(){
+  var q=f.q.trim().toLowerCase();
+  var a=leads.filter(function(l){
+    if(f.stage&&l.stage!==f.stage)return false;if(f.source&&l.source!==f.source)return false;
+    return !q||[l.name,l.company,l.phone,l.email,l.requirement,l.notes,l.source,l.referredBy].join(' ').toLowerCase().indexOf(q)>=0;
+  });
+  if(f.sort==='due')a.sort(byNext);else if(f.sort==='new')a.sort(function(x,y){return (y.created||'').localeCompare(x.created||'');});
+  else if(f.sort==='value')a.sort(function(x,y){return (Number(y.value)||0)-(Number(x.value)||0);});else a.sort(function(x,y){return (x.name||'').localeCompare(y.name||'');});
+  return a;
+}
+function updateTable(){
+  var a=filtered(),el=$('#alltbl');
+  if(!a.length){el.innerHTML='<p class="muted pad">No leads match these filters.</p>';return;}
+  el.innerHTML='<div class="tablewrap"><table><thead><tr><th>Lead</th><th>Requirement</th><th>Stage</th><th>Source</th><th class="r">Value</th><th>Next follow-up</th></tr></thead><tbody>'+
+  a.map(function(l){var di=dueInfo(l);return '<tr class="click" tabindex="0" data-open="'+l.id+'"><td><strong>'+esc(l.name)+'</strong>'+(l.sample?' <span class="tag">Sample</span>':'')+'<div class="muted">'+esc(l.company||'')+'</div></td><td>'+esc(l.requirement||'')+'</td><td>'+stagePill(l.stage)+'</td><td>'+esc(l.source||'')+(l.referredBy?'<div class="muted">'+esc(l.referredBy)+'</div>':'')+'</td><td class="num r">'+(l.value?inr(l.value):'')+'</td><td>'+(isOpen(l)?'<span class="due '+di.k+'">'+esc(di.label)+'</span>':'<span class="muted">-</span>')+'</td></tr>';}).join('')+'</tbody></table></div>';
+}
+function barRows(rows,max,cls){
+  return rows.map(function(r){return '<div class="bl '+(cls||'')+'"><span>'+esc(r[0])+'</span><span class="t"><i style="width:'+(max?Math.round(r[1]/max*100):0)+'%"></i></span><span class="num">'+r[1]+'</span></div>';}).join('');
+}
+function dashHtml(){
+  var t=today(),won=leads.filter(function(l){return l.stage==='won';}),lost=leads.filter(function(l){return l.stage==='lost';}),open=leads.filter(isOpen);
+  var closedN=won.length+lost.length,conv=closedN?Math.round(won.length/closedN*100):0;
+  var wonV=won.reduce(function(s,l){return s+(Number(l.value)||0);},0),pipeV=open.reduce(function(s,l){return s+(Number(l.value)||0);},0);
+  var over=open.filter(function(l){return l.next&&l.next<t;}).length,nodate=open.filter(function(l){return !l.next;}).length;
+  var h='<div class="stats"><div class="stat"><div class="k">Total leads</div><div class="v">'+leads.length+'</div></div><div class="stat"><div class="k">Open pipeline</div><div class="v">'+inr(pipeV)+'</div></div><div class="stat"><div class="k">Won</div><div class="v">'+won.length+' · '+inr(wonV)+'</div></div><div class="stat"><div class="k">Win rate</div><div class="v">'+(closedN?conv+'%':'-')+'</div></div><div class="stat"><div class="k">Overdue follow-ups</div><div class="v'+(over?' alert':'')+'">'+over+'</div></div></div><div class="cols">';
+  var sc=STAGES.map(function(s){return [s.label,leads.filter(function(l){return l.stage===s.id;}).length];}),mx=Math.max.apply(null,sc.map(function(r){return r[1];}).concat([1]));
+  h+='<section class="panel"><h3>Leads by stage</h3><div class="bars">'+barRows(sc,mx)+'</div></section>';
+  var src=SOURCES.map(function(s){return [s,leads.filter(function(l){return (l.source||'Other')===s;}).length];}).filter(function(r){return r[1];}).sort(function(a,b){return b[1]-a[1];});
+  h+='<section class="panel"><h3>Where leads come from</h3><div class="bars">'+(src.length?barRows(src,Math.max.apply(null,src.map(function(r){return r[1];}))):'<span class="muted">No data yet.</span>')+'</div></section>';
+  var months=[],d=new Date();for(var i=5;i>=0;i--){var m=new Date(d.getFullYear(),d.getMonth()-i,1);months.push([m.toLocaleDateString('en-IN',{month:'short'}),ymd(m).slice(0,7)]);}
+  var mc=months.map(function(m){return [m[0],leads.filter(function(l){return (l.created||'').slice(0,7)===m[1];}).length];});
+  h+='<section class="panel"><h3>New leads, last 6 months</h3><div class="bars">'+barRows(mc,Math.max.apply(null,mc.map(function(r){return r[1];}).concat([1])))+'</div></section>';
+  var lr=LOST_REASONS.map(function(r){return [r,lost.filter(function(l){return l.lostReason===r;}).length];}).filter(function(r){return r[1];});
+  h+='<section class="panel"><h3>Follow-up health</h3><div class="bars">'+barRows([['Open leads',open.length],['Overdue',over],['No date set',nodate]],Math.max(open.length,1))+'</div>'+(lr.length?'<h3 style="margin-top:16px">Why leads were lost</h3><div class="bars">'+barRows(lr,Math.max.apply(null,lr.map(function(r){return r[1];})))+'</div>':'')+'</section></div>';
+  return h;
+}
+function automationHtml(){
+  var g=cfg.gaps,ro=isAdmin?'':' disabled';
+  function gi(k,l){return '<div><label for="g-'+k+'">'+l+'</label><input id="g-'+k+'" type="number" min="0" max="60" value="'+g[k]+'"'+ro+'></div>';}
+  var h='<div class="cols"><section class="panel"><h3>How the automation works</h3><ul class="rules">'+
+  '<li>Every stage change plans the next follow-up date by the gaps on this page.</li>'+
+  '<li>Moving a lead to <b>Meeting</b> asks for the meeting date and time and uses it as the follow-up.</li>'+
+  '<li>Moving a lead to <b>Proposal sent</b> asks how many days to wait before following up. The default is '+g.proposal+' days.</li>'+
+  '<li>Logging a call, WhatsApp, SMS or email moves a New lead to Contacted and plans the next follow-up.</li>'+
+  '<li>After <b>'+cfg.maxAttempts+'</b> attempts with no response the lead page suggests marking it Lost.</li>'+
+  '<li>Each due lead has a ready message for WhatsApp, SMS and email. You press send, then <b>Mark as sent</b> to log it.</li></ul>'+
+  '<div class="notice warn"><span>LeadFlow does not send messages by itself. Automatic sending needs a WhatsApp Business API or an SMS gateway, which are paid services with their own setup.</span></div></section>'+
+  '<section class="panel"><h3>Rules'+(isAdmin?'':' (view only)')+'</h3><form id="cfgform" autocomplete="off"><div class="grid2"><div><label for="c-biz">Business name</label><input id="c-biz" value="'+esc(cfg.business)+'"'+ro+'></div><div><label for="c-me">Your name in messages</label><input id="c-me" value="'+esc(cfg.me||me.name)+'"'+ro+'></div></div>'+
+  '<p class="hint" style="margin:0 0 8px">Days to wait before the next follow-up</p><div class="grid2">'+gi('new','After New lead')+gi('contacted','After Contacted')+gi('meeting','After Meeting')+gi('proposal','After Proposal sent')+gi('followup','After Follow-up')+'<div><label for="c-max">Attempts before suggesting Lost</label><input id="c-max" type="number" min="1" max="20" value="'+cfg.maxAttempts+'"'+ro+'></div></div>'+
+  '<p class="hint" style="margin:0 0 8px">Message for each stage. Use {name} {company} {requirement} {me} {business} {meeting}.</p>'+
+  ['new','contacted','meeting','proposal','followup'].map(function(s){return '<div class="fld"><label for="t-'+s+'">'+lbl(s)+'</label><textarea id="t-'+s+'" rows="3"'+ro+'>'+esc(cfg.templates[s])+'</textarea></div>';}).join('')+
+  '<div class="fld"><label for="c-sub">Email subject</label><input id="c-sub" value="'+esc(cfg.subject)+'"'+ro+'></div>'+
+  (isAdmin?'<div class="dfoot"><button class="btn primary" type="submit">Save rules</button><button class="btn" data-act="resetcfg" type="button">Reset to defaults</button></div>':'<p class="hint">Only people with Editor access can change the rules.</p>')+'</form></section></div>';
+  return h;
+}
+
+/* ---------- drawer (lead) ---------- */
+function blankLead(p){return Object.assign({id:'',name:'',company:'',phone:'',email:'',requirement:'',source:'Reference',referredBy:'',stage:'new',value:0,next:addDays(today(),gapFor('new')),meetingAt:'',notes:'',attempts:0,activity:[]},p||{});}
+function opt(list,cur){return list.map(function(x){var v=Array.isArray(x)?x[0]:(x.id||x),t=Array.isArray(x)?x[1]:(x.label||x);return '<option value="'+esc(v)+'"'+(v===cur?' selected':'')+'>'+esc(t)+'</option>';}).join('');}
+function drawerHtml(l,isNew){
+  var h='<div class="dh"><h2 id="dtitle">'+(isNew?'New lead':esc(l.name))+'</h2><button class="btn sm" data-act="close" type="button">Close</button></div>';
+  if(!isNew&&isOpen(l)&&(l.attempts||0)>=cfg.maxAttempts)h+='<div class="notice warn"><span>'+l.attempts+' attempts with no response. Consider marking this lead Lost.</span><button class="btn sm" data-act="stagelost" data-id="'+l.id+'" type="button">Mark Lost</button></div>';
+  h+='<form id="lf" autocomplete="off" novalidate><div class="grid2"><div><label for="f-name">Name</label><input id="f-name" value="'+esc(l.name)+'" required></div><div><label for="f-company">Company</label><input id="f-company" value="'+esc(l.company)+'"></div>'+
+  '<div><label for="f-phone">Mobile number</label><input id="f-phone" type="tel" inputmode="tel" value="'+esc(l.phone)+'" placeholder="98200 00000"></div><div><label for="f-email">Email address</label><input id="f-email" type="email" value="'+esc(l.email)+'"></div>'+
+  '<div><label for="f-source">How did the lead come?</label><select id="f-source">'+opt(SOURCES,l.source)+'</select></div><div><label for="f-ref">Referred by</label><input id="f-ref" value="'+esc(l.referredBy)+'" placeholder="Name of the person"></div>'+
+  '<div><label for="f-value">Deal value (₹)</label><input id="f-value" type="number" min="0" step="1000" inputmode="numeric" value="'+(l.value?esc(l.value):'')+'"></div><div><label for="f-next">Next follow-up</label><input id="f-next" type="date" value="'+esc(l.next)+'"></div></div>'+
+  '<div class="fld"><label for="f-req">What do they need?</label><textarea id="f-req" rows="2">'+esc(l.requirement)+'</textarea></div>'+
+  '<div class="fld"><label for="f-notes">Notes</label><textarea id="f-notes" rows="2">'+esc(l.notes)+'</textarea></div>'+
+  (isNew?'<div class="fld"><label for="f-stage">Stage</label><select id="f-stage">'+opt(STAGES,l.stage)+'</select></div>':'<p class="muted" style="margin:0 0 4px">Stage: '+stagePill(l.stage)+(l.meetingAt&&l.stage==='meeting'?' <span class="muted">'+esc(fmtMeet(l.meetingAt))+'</span>':'')+'</p>')+
+  '<div class="dfoot"><button class="btn primary" type="submit">Save lead</button>'+(!isNew?'<button class="btn" data-act="send" data-id="'+l.id+'" type="button">Message</button><button class="btn" data-act="stage" data-id="'+l.id+'" type="button">Change stage</button>':'')+'<span class="spacer"></span>'+(!isNew?'<button class="btn danger" data-act="delete" type="button">Delete</button>':'')+'</div></form>';
+  if(!isNew){
+    h+='<section class="logbox"><h3>Log a follow-up</h3><div class="grid2"><div><label for="a-type">Type</label><select id="a-type">'+opt(ACT_TYPES,'call')+'</select></div><div><label for="a-out">Result</label><select id="a-out">'+opt(OUTCOMES,'interested')+'</select></div></div>'+
+    '<div class="fld"><label for="a-text">What was discussed?</label><textarea id="a-text" rows="2" placeholder="Asked for revised quote, will confirm by Friday"></textarea></div>'+
+    '<div class="grid2"><div><label for="a-next">Next follow-up</label><select id="a-next"><option value="auto" selected>Automatic (by rule)</option><option value="1">Tomorrow</option><option value="3">In 3 days</option><option value="5">In 5 days</option><option value="7">In 1 week</option><option value="14">In 2 weeks</option><option value="none">No follow-up</option></select></div></div>'+
+    '<div class="dfoot"><button class="btn primary" data-act="logsave" type="button">Log activity</button></div>';
+    var acts=(l.activity||[]).slice().reverse();
+    if(acts.length)h+='<ul class="tl">'+acts.map(function(a){var tl=a.type==='system'?'System':(ACT_TYPES.filter(function(x){return x[0]===a.type;})[0]||[0,a.type])[1];
+      return '<li class="'+(a.type==='system'?'sys':'')+'"><span class="ty">'+esc(tl)+'</span><div><div class="tx">'+esc(a.text)+'</div><div class="when">'+fmtStamp(a.t)+(a.by?' · <span data-by="'+esc(a.by)+'"></span>':'')+'</div></div></li>';}).join('')+'</ul>';
+    h+='</section>';
+  }
+  return h;
+}
+function openDrawer(id,focusLog,prefill){
+  var isNew=!id||id==='new',l=isNew?blankLead(prefill):leads.find(function(x){return x.id===id;});
+  if(!l)return;
+  if(drawerId===undefined)lastFocus=document.activeElement;
+  drawerId=isNew?'new':id;
+  var d=$('#drawer');d.innerHTML=drawerHtml(l,isNew);d.hidden=false;$('#scrim').hidden=false;
+  if(isNew)$('#f-name').focus();else if(focusLog&&$('#a-text'))$('#a-text').focus();else d.focus();
+  if(userCap&&userCap.profiles){var ids=[];Array.prototype.forEach.call(d.querySelectorAll('[data-by]'),function(e){if(ids.indexOf(e.dataset.by)<0)ids.push(e.dataset.by);});
+    if(ids.length)userCap.profiles(ids).then(function(p){Array.prototype.forEach.call(d.querySelectorAll('[data-by]'),function(e){var x=p[e.dataset.by];e.textContent=(x&&x.name)||'Someone';});}).catch(function(){});}
+}
+function closeDrawer(){$('#drawer').hidden=true;$('#scrim').hidden=true;drawerId=undefined;if(lastFocus&&lastFocus.focus&&document.contains(lastFocus))lastFocus.focus();}
+function readForm(){
+  function g(id){return $('#'+id).value.trim();}
+  return {name:g('f-name'),company:g('f-company'),phone:g('f-phone'),email:g('f-email'),source:$('#f-source').value,referredBy:g('f-ref'),value:Number($('#f-value').value)||0,next:$('#f-next').value,requirement:g('f-req'),notes:g('f-notes')};
+}
+function submitForm(){
+  var v=readForm();
+  if(!v.name){toast('Add a name for this lead.');$('#f-name').focus();return;}
+  if(drawerId==='new'){
+    var now=new Date().toISOString(),st=$('#f-stage').value;
+    var n=Object.assign({id:mkId(),created:now,closed:'',meetingAt:'',attempts:0,stage:st,activity:[{t:now,type:'system',text:'Lead added',by:me.id||''}]},v);
+    if(st==='won'||st==='lost'){n.next='';n.closed=today();}
+    saveLead(n);closeDrawer();toast('Lead added. Next follow-up '+(n.next?fmtDate(n.next):'not set')+'.');
+  }else{
+    var base=leads.find(function(x){return x.id===drawerId;});if(!base)return;
+    saveLead(Object.assign({},base,v));closeDrawer();toast('Lead saved.');
+  }
+}
+function logActivity(){
+  var base=leads.find(function(x){return x.id===drawerId;});if(!base)return;
+  var v=readForm();if(!v.name){toast('Add a name for this lead.');return;}
+  var n=Object.assign({},base,v),type=$('#a-type').value,out=$('#a-out').value,nx=$('#a-next').value;
+  var typeLabel=(ACT_TYPES.filter(function(x){return x[0]===type;})[0]||[0,'Note'])[1],outLabel=(OUTCOMES.filter(function(x){return x[0]===out;})[0]||[0,''])[1];
+  var txt=$('#a-text').value.trim();
+  var entry={t:new Date().toISOString(),type:type,text:(type==='note'?'':outLabel+'. ')+(txt||typeLabel+' logged'),by:me.id||''};
+  n.activity=(n.activity||[]).concat([entry]);
+  if(type!=='note'){
+    if(n.stage==='new')n=applyStage(n,'contacted',{days:'none'});
+    n.attempts=out==='noreply'?(n.attempts||0)+1:0;
+  }
+  if(type!=='note'&&out==='notint'){
+    n=applyStage(n,'lost',{reason:'No longer needed'});
+  }else if(isOpen(n)&&type!=='note'){
+    var days=nx==='auto'?(out==='noreply'?1:gapFor(out==='interested'||out==='time'?'followup':n.stage)):nx;
+    if(nx==='none')n.next='';
+    else{n.next=addDays(today(),Number(days));n.activity.push(sys('Auto: next follow-up '+fmtDate(n.next)+(nx==='auto'?' (rule)':'')));}
+  }
+  saveLead(n);
+  if(isOpen(n)&&(n.attempts||0)>=cfg.maxAttempts)toast(n.attempts+' attempts with no response. Consider marking this lead Lost.');else toast('Activity logged.');
+  openDrawer(n.id,true);
+}
+
+/* ---------- dialog ---------- */
+function openModal(html){
+  modal=true;var m=$('#modal');m.innerHTML=html;m.hidden=false;$('#scrim2').hidden=false;
+  var first=m.querySelector('input,select,textarea,button');if(first)first.focus();else m.focus();
+}
+function closeModal(){modal=null;$('#modal').hidden=true;$('#scrim2').hidden=true;$('#modal').removeAttribute('data-lead');}
+function mhead(t){return '<div class="dh"><h2 id="mtitle">'+t+'</h2><button class="btn sm" data-act="mclose" type="button">Close</button></div>';}
+function stageModal(id,stage){
+  var l=leads.find(function(x){return x.id===id;});if(!l||l.stage===stage)return;
+  var h=mhead('Move '+esc(l.name)+' to '+esc(lbl(stage)))+'<form id="sf" data-id="'+id+'" data-stage="'+stage+'" autocomplete="off">';
+  if(stage==='won')h+='<div class="fld"><label for="s-val">Final deal value (₹)</label><input id="s-val" type="number" min="0" step="1000" inputmode="numeric" value="'+(l.value||'')+'"></div>';
+  else if(stage==='lost')h+='<div class="fld"><label for="s-reason">Why was it lost?</label><select id="s-reason">'+opt(LOST_REASONS,'No response')+'</select></div><div class="fld"><label for="s-note">Note (optional)</label><input id="s-note"></div>';
+  else if(stage==='meeting'){var d=new Date();d.setDate(d.getDate()+1);d.setHours(11,0,0,0);var v=ymd(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+    h+='<div class="fld"><label for="s-meet">Meeting date and time</label><input id="s-meet" type="datetime-local" value="'+(l.meetingAt||v)+'"></div><p class="hint">This date becomes the next follow-up.</p>';}
+  else{var g=gapFor(stage),opts=[1,2,3,5,7,10,14];if(opts.indexOf(g)<0)opts.push(g);opts.sort(function(a,b){return a-b;});
+    h+='<div class="fld"><label for="s-days">'+(stage==='proposal'?'Follow up on the proposal after':'Next follow-up in')+'</label><select id="s-days">'+opts.map(function(d){return '<option value="'+d+'"'+(d===g?' selected':'')+'>'+d+(d===1?' day':' days')+(d===g?' (rule)':'')+'</option>';}).join('')+'<option value="none">No follow-up</option></select></div>';}
+  h+='<div class="dfoot"><button class="btn primary" type="submit">Move lead</button></div></form>';
+  openModal(h);
+}
+function confirmStage(form){
+  var l=leads.find(function(x){return x.id===form.dataset.id;});if(!l)return;
+  var st=form.dataset.stage,o={};
+  if(st==='won')o.value=$('#s-val').value;
+  else if(st==='lost'){o.reason=$('#s-reason').value;o.note=$('#s-note').value.trim();}
+  else if(st==='meeting'){o.meetingAt=$('#s-meet').value;if(!o.meetingAt){toast('Choose the meeting date and time.');return;}}
+  else o.days=$('#s-days').value;
+  saveLead(applyStage(l,st,o));closeModal();
+  if(drawerId===l.id)openDrawer(l.id);
+  toast('Moved to '+lbl(st)+'.');
+}
+function sendModal(id,ch){
+  var l=leads.find(function(x){return x.id===id;});if(!l)return;
+  ch=ch||'wa';var msg=stageMessage(l),subj=fillTpl(cfg.subject,l),num=phoneDigits(l.phone);
+  var h=mhead('Message '+esc(l.name))+'<div class="seg" role="group" aria-label="Channel"><button type="button" data-ch="wa" aria-pressed="'+(ch==='wa')+'">WhatsApp</button><button type="button" data-ch="sms" aria-pressed="'+(ch==='sms')+'">SMS</button><button type="button" data-ch="email" aria-pressed="'+(ch==='email')+'">Email</button></div>'+
+  '<div class="fld"><label for="m-text">Message ('+esc(lbl(l.stage))+' stage)</label><textarea id="m-text" rows="5">'+esc(msg)+'</textarea></div>'+
+  '<div class="dfoot" id="m-links"></div><p class="hint">Press send in the other app, then come back and press Mark as sent so it is logged. Email and SMS links may not open from this page. Use Copy text if nothing happens.</p>'+
+  '<div class="dfoot"><button class="btn primary" data-act="marksent" type="button">Mark as sent</button></div>';
+  openModal(h);var m=$('#modal');m.dataset.lead=id;m.dataset.ch=ch;m.dataset.subj=subj;m.dataset.num=num;m.dataset.email=l.email||'';
+  updateSendLinks();
+}
+function updateSendLinks(){
+  var m=$('#modal'),ch=m.dataset.ch,t=$('#m-text').value,box=$('#m-links');if(!box)return;
+  var num=m.dataset.num,em=m.dataset.email,subj=m.dataset.subj,h='';
+  if(ch==='wa')h=num?'<a class="btn" target="_blank" rel="noopener" href="https://wa.me/'+num+'?text='+encodeURIComponent(t)+'">Open WhatsApp</a>':'<span class="muted">Add a valid mobile number to use WhatsApp.</span>';
+  else if(ch==='sms')h=num?'<a class="btn" href="sms:+'+num+'?body='+encodeURIComponent(t)+'">Open SMS</a>':'<span class="muted">Add a valid mobile number to use SMS.</span>';
+  else h=em?'<a class="btn" href="mailto:'+esc(em)+'?subject='+encodeURIComponent(subj)+'&amp;body='+encodeURIComponent(t)+'">Open email</a>':'<span class="muted">Add an email address to use email.</span>';
+  box.innerHTML=h+'<button class="btn" data-act="copytext" type="button">Copy text</button>';
+}
+function markSent(){
+  var m=$('#modal'),l=leads.find(function(x){return x.id===m.dataset.lead;});if(!l)return;
+  var chn={wa:'whatsapp',sms:'sms',email:'email'}[m.dataset.ch],name={wa:'WhatsApp',sms:'SMS',email:'Email'}[m.dataset.ch];
+  var n=Object.assign({},l);n.activity=(l.activity||[]).concat([{t:new Date().toISOString(),type:chn,text:name+' message sent: '+$('#m-text').value.trim().slice(0,160),by:me.id||''}]);
+  if(n.stage==='new')n=applyStage(n,'contacted');else{n.next=addDays(today(),gapFor(n.stage));n.activity.push(sys('Auto: next follow-up '+fmtDate(n.next)+' (rule)'));}
+  saveLead(n);closeModal();if(drawerId===l.id)openDrawer(l.id);toast(name+' marked as sent. Next follow-up '+fmtDate(n.next)+'.');
+}
+
+/* ---------- smart add (speak or paste) ---------- */
+function smartModal(){
+  var h=mhead('Speak or paste lead details')+'<p class="muted" style="margin-top:0">Say or paste what you know about the lead, in Marathi, Hindi or English. LeadFlow fills the form for you to check.</p>';
+  if(dict)h+='<div class="grid2"><div><label for="sm-lang">Speaking language</label><select id="sm-lang"><option value="mr-IN">Marathi</option><option value="hi-IN">Hindi</option><option value="en-IN">English</option></select></div><div style="align-self:end"><button class="btn" id="sm-mic" data-act="mic" type="button">Start speaking</button></div></div>';
+  h+='<div class="fld"><label for="sm-text">Details</label><textarea id="sm-text" rows="6" placeholder="Rohan Mehta from Mehta Printing, 98200 00000, needs a catalogue website, came through Suresh Patil\'s reference"></textarea></div><div class="dfoot"><button class="btn primary" data-act="smartfill" type="button">'+(sampler?'Fill lead form':'Open form with these notes')+'</button></div><p class="hint" id="sm-msg"></p>';
+  openModal(h);
+}
+var dictOff=[];
+function toggleMic(){
+  var b=$('#sm-mic');if(!dict||!b)return;
+  if(dict.active()){dict.stop().catch(function(){});return;}
+  var ta=$('#sm-text'),base=ta.value,fin='';
+  dictOff.forEach(function(u){u();});dictOff=[];
+  dictOff.push(dict.onPartial(function(e){ta.value=(base+' '+fin+' '+e.text).trim();}));
+  dictOff.push(dict.onFinal(function(e){fin+=' '+e.text;ta.value=(base+' '+fin).trim();}));
+  dictOff.push(dict.onState(function(e){var bb=$('#sm-mic');if(bb)bb.textContent=e.state==='listening'?'Stop':(e.state==='idle'?'Start speaking':'Please wait');}));
+  dict.start({language:$('#sm-lang').value}).catch(function(e){var mm=$('#sm-msg');if(mm)mm.textContent=e&&e.code==='not_granted'?'Microphone use was not allowed. You can still type or paste.':'Dictation could not start here. You can still type or paste.';});
+}
+function smartFill(){
+  var txt=$('#sm-text').value.trim(),msg=$('#sm-msg');
+  if(!txt){msg.textContent='Say or type something first.';return;}
+  if(dict&&dict.active())dict.stop().catch(function(){});
+  if(!sampler){closeModal();openDrawer('new',false,{notes:txt});return;}
+  msg.textContent='Reading the details…';
+  var prompt='Extract a sales lead from the text below. The text may be Marathi, Hindi or English, or a mix, and may contain speech recognition mistakes. Return ONLY a JSON object with these keys: name, company, phone (digits as spoken), email, requirement (short English phrase), source (exactly one of '+SOURCES.join(', ')+'), referredBy (person who referred, else empty), value (number in rupees, 0 if unknown), notes (anything useful left over, in English). Write names in English letters. Use an empty string when a detail is missing. Never invent details.\n\nText:\n'+txt;
+  sampler.json(prompt,{cache:false,modelTier:'quick'}).then(function(o){
+    o=o||{};var p={name:String(o.name||''),company:String(o.company||''),phone:String(o.phone||''),email:String(o.email||''),requirement:String(o.requirement||''),source:SOURCES.indexOf(o.source)>=0?o.source:'Other',referredBy:String(o.referredBy||''),value:Number(o.value)||0,notes:String(o.notes||'')};
+    if(p.referredBy&&p.source==='Other')p.source='Reference';
+    closeModal();openDrawer('new',false,p);toast('Form filled. Please check the details and save.');
+  }).catch(function(e){msg.textContent=(e&&e.code==='not_granted')?'Permission was not given. You can still open the form with your notes.':'Could not read the details. Try again, or open the form with your notes.';});
+}
+
+/* ---------- scan (OCR): photo or visiting card to lead form ---------- */
+var scanCaps=null;
+function scanModal(){
+  var h=mhead('Scan card or photo')+'<p class="muted" style="margin-top:0">Take a photo of a visiting card, letter, order slip or handwritten note, or upload an image. LeadFlow reads the text (Marathi, Hindi or English) and fills the lead form for you to check and submit.</p>';
+  if(!sampler){
+    h+='<div class="notice warn"><span>Scanning is not available here. Use Add lead, or Speak or paste details.</span></div>';
+    openModal(h);return;
+  }
+  h+='<div class="fld"><label for="sc-file">Photo or image</label><input id="sc-file" type="file" accept="image/*" capture="environment"></div>'+
+    '<div id="sc-prev" class="fld" hidden><img id="sc-img" alt="Selected photo preview" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--line)"></div>'+
+    '<div class="dfoot"><button class="btn primary" id="sc-go" data-act="scanfill" type="button" disabled>Read and fill form</button></div><p class="hint" id="sc-msg">Choose or take a photo to begin.</p>';
+  openModal(h);
+  if(sampler.limits)sampler.limits().then(function(c){scanCaps=c;var m=$('#sc-msg');if(m&&!(c&&c.images))m.textContent='Reading photos is not enabled for this page. Use Speak or paste details instead.';}).catch(function(){});
+}
+function scanPick(file){
+  var go=$('#sc-go'),msg=$('#sc-msg'),prev=$('#sc-prev'),img=$('#sc-img');
+  if(!go)return;
+  if(!file){go.disabled=true;prev.hidden=true;return;}
+  img.src=URL.createObjectURL(file);prev.hidden=false;go.disabled=false;msg.textContent='Ready. Press Read and fill form.';
+}
+function scanPrepare(file){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(file),im=new Image();
+    im.onload=function(){
+      var k=Math.min(1,1800/Math.max(im.width,im.height)),c=document.createElement('canvas');
+      c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);
+      c.toBlob(function(b){b?res(b):rej(new Error('encode'));},'image/jpeg',0.85);
+    };
+    im.onerror=function(){URL.revokeObjectURL(url);rej(new Error('load'));};
+    im.src=url;
+  });
+}
+function scanFill(){
+  var inp=$('#sc-file'),msg=$('#sc-msg'),go=$('#sc-go'),f=inp&&inp.files&&inp.files[0];
+  if(!f){msg.textContent='Choose or take a photo first.';return;}
+  if(!sampler||!scanCaps||!scanCaps.images){msg.textContent='Reading photos is not enabled for this page.';return;}
+  go.disabled=true;msg.textContent='Reading the photo…';
+  scanPrepare(f).then(function(blob){
+    var prompt='The attached image is a photo or scan related to a sales lead (for example a visiting card, letter, order slip, signboard or handwritten note). Read all the text in it with OCR. It may be in Marathi, Hindi or English, or a mix. Then extract a lead. Return ONLY a JSON object with these keys: name (the person), company, phone (mobile number digits only, no country code or spaces if clear), email, requirement (short English phrase describing what they need or what the business does, else empty), source (exactly one of '+SOURCES.join(', ')+'; use Walk-in for a visiting card unless the image says otherwise), referredBy (empty unless stated), value (number in rupees, 0 if unknown), notes (other useful text from the image such as address, website, designation, other phone numbers, in English). Write names in English letters. Use an empty string when a detail is missing. Never invent details.';
+    return sampler.json(prompt,{cache:false,modelTier:'quick',images:[blob]});
+  }).then(function(o){
+    o=o||{};var p={name:String(o.name||''),company:String(o.company||''),phone:String(o.phone||''),email:String(o.email||''),requirement:String(o.requirement||''),source:SOURCES.indexOf(o.source)>=0?o.source:'Walk-in',referredBy:String(o.referredBy||''),value:Number(o.value)||0,notes:String(o.notes||'')};
+    closeModal();openDrawer('new',false,p);toast('Form filled from the photo. Please check the details and save.');
+  }).catch(function(e){
+    go.disabled=false;
+    msg.textContent=(e&&e.code==='not_granted')?'Permission was not given to read the photo.':'Could not read the photo. Try a clearer, well-lit picture.';
+  });
+}
+
+/* ---------- samples and export ---------- */
+function sampleLeads(){
+  var t=today();
+  function at(n,h){var d=new Date();d.setDate(d.getDate()+n);d.setHours(h||11,0,0,0);return d.toISOString();}
+  function mk(o){return Object.assign({id:mkId(),sample:true,closed:'',created:at(-12),email:'',notes:'',meetingAt:'',attempts:0,referredBy:''},o);}
+  return [
+    mk({name:'Rohan Mehta',company:'Mehta Printing Works',phone:'90000 00001',email:'rohan@example.com',requirement:'Catalogue website with enquiry form',source:'Reference',referredBy:'Suresh Patil',stage:'proposal',value:85000,next:addDays(t,-2),activity:[{t:at(-9),type:'call',text:'Spoke, interested. Wants a 12-page website'},{t:at(-4),type:'email',text:'Email message sent: proposal and timeline'}]}),
+    mk({name:'Priya Nair',company:'Nair Aesthetic Clinic',phone:'90000 00002',requirement:'Online appointment booking',source:'Instagram',stage:'contacted',value:120000,next:t,activity:[{t:at(-3),type:'whatsapp',text:'Shared two clinic sites we built'}]}),
+    mk({name:'Imran Shaikh',company:'Shaikh Logistics',phone:'90000 00003',requirement:'Shipment tracking page',source:'IndiaMART',stage:'new',value:60000,next:addDays(t,1),activity:[{t:at(0,9),type:'system',text:'Lead added'}]}),
+    mk({name:'Kavita Joshi',company:'Joshi Leather Co.',phone:'90000 00004',requirement:'Online store with checkout',source:'Website',stage:'meeting',value:150000,meetingAt:addDays(t,2)+'T11:00',next:addDays(t,2),activity:[{t:at(-5),type:'call',text:'Spoke, interested. Wants to meet at her workshop'}]}),
+    mk({name:'Suresh Patil',company:'Patil Agro Exports',phone:'90000 00005',requirement:'Export catalogue site',source:'JustDial',stage:'followup',value:95000,next:addDays(t,-5),attempts:2,activity:[{t:at(-7),type:'call',text:'No response'},{t:at(-3),type:'call',text:'No response'}]}),
+    mk({name:'Neha Kapoor',company:'Kapoor Financial Services',phone:'90000 00006',requirement:'Company website',source:'Cold call',stage:'new',value:45000,next:'',activity:[{t:at(-1),type:'note',text:'Added from a networking event list'}]}),
+    mk({name:'Amit Desai',company:'Desai Bakers',phone:'90000 00007',requirement:'Menu site with WhatsApp ordering',source:'WhatsApp',stage:'won',value:40000,next:'',closed:addDays(t,-4),activity:[{t:at(-4),type:'system',text:'Stage: Follow-up to Won'}]}),
+    mk({name:'Farhan Qureshi',company:'Qureshi Security Systems',phone:'90000 00008',requirement:'Security products site',source:'Reference',referredBy:'Imran Shaikh',stage:'lost',value:70000,next:'',closed:addDays(t,-6),lostReason:'Chose someone else',activity:[{t:at(-6),type:'system',text:'Stage: Proposal sent to Lost'}]})
+  ];
+}
+function csvCell(v){v=String(v==null?'':v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function exportCSV(){
+  var rows=[['Name','Company','Phone','Email','Requirement','Source','Referred by','Stage','Deal value (INR)','Next follow-up','Last contact','Notes','Added']];
+  leads.slice().sort(byNext).forEach(function(l){var la=lastAct(l);rows.push([l.name,l.company,l.phone,l.email,l.requirement,l.source,l.referredBy,lbl(l.stage),l.value||'',l.next||'',la?ymd(new Date(la.t)):'',l.notes,l.created?ymd(new Date(l.created)):'']);});
+  var csv='﻿'+rows.map(function(r){return r.map(csvCell).join(',');}).join('\r\n');
+  if(dl){dl.save({filename:'leadflow-'+today()+'.csv',data:csv}).then(function(){toast('Export ready.');}).catch(function(e){if(!e||e.code!=='declined')toast("Couldn't export the file here.");});return;}
+  var el=document.createElement('a');el.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));el.download='leadflow-'+today()+'.csv';document.body.appendChild(el);el.click();el.remove();
+}
+
+/* ---------- events ---------- */
+function handleAct(b){
+  var a=b.dataset.act,id=b.dataset.id;
+  if(a==='add')openDrawer('new');
+  else if(a==='smart')smartModal();
+  else if(a==='scan')scanModal();
+  else if(a==='scanfill')scanFill();
+  else if(a==='goauto'){location.hash='#automation';view='automation';$('#main').dataset.dirty='';render();}
+  else if(a==='close')closeDrawer();
+  else if(a==='mclose'){if(dict&&dict.active())dict.stop().catch(function(){});closeModal();}
+  else if(a==='export')exportCSV();
+  else if(a==='log')openDrawer(id,true);
+  else if(a==='send')sendModal(id);
+  else if(a==='snooze')snooze(id,Number(b.dataset.days));
+  else if(a==='stage'){var l=leads.find(function(x){return x.id===id;});if(l)openModal(mhead('Change stage of '+esc(l.name))+'<div class="seg" role="group" aria-label="Stage">'+STAGES.filter(function(s){return s.id!==l.stage;}).map(function(s){return '<button type="button" data-pick="'+s.id+'" data-id="'+id+'">'+s.label+'</button>';}).join('')+'</div>');}
+  else if(a==='stagelost')stageModal(id,'lost');
+  else if(a==='logsave')logActivity();
+  else if(a==='marksent')markSent();
+  else if(a==='mic')toggleMic();
+  else if(a==='smartfill')smartFill();
+  else if(a==='copytext'){var t=$('#m-text').value;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('Message copied.');}).catch(function(){$('#m-text').select();toast('Select the text and copy it.');});else{$('#m-text').select();toast('Select the text and copy it.');}}
+  else if(a==='samples'){Promise.all(sampleLeads().map(function(l){return saveLead(l,true);})).then(function(){render();toast('Sample leads added.');});}
+  else if(a==='rmsamples'){var s=leads.filter(function(l){return l.sample;});Promise.all(s.map(function(l){return removeLead(l.id);})).then(function(){render();toast('Sample leads removed.');});}
+  else if(a==='resetcfg'){saveCfg(clone(DEFAULT_CFG)).then(function(){$('#main').dataset.dirty='';render();});}
+  else if(a==='delete'){
+    if(b.classList.contains('armed')){clearTimeout(delTimer);var did=drawerId;closeDrawer();removeLead(did).then(function(){render();toast('Lead deleted.');});}
+    else{b.classList.add('armed');b.textContent='Click again to delete';clearTimeout(delTimer);delTimer=setTimeout(function(){b.classList.remove('armed');b.textContent='Delete';},4000);}
+  }
+}
+document.addEventListener('click',function(e){
+  var pk=e.target.closest('[data-pick]');if(pk){closeModal();stageModal(pk.dataset.id,pk.dataset.pick);return;}
+  var ch=e.target.closest('[data-ch]');if(ch&&$('#modal').contains(ch)){var m=$('#modal');m.dataset.ch=ch.dataset.ch;Array.prototype.forEach.call(m.querySelectorAll('[data-ch]'),function(x){x.setAttribute('aria-pressed',String(x===ch));});updateSendLinks();return;}
+  var a=e.target.closest('[data-act]');if(a){handleAct(a);return;}
+  var tab=e.target.closest('.tab');if(tab){location.hash='#'+tab.dataset.view;view=tab.dataset.view;$('#main').dataset.dirty='';render();return;}
+  if(e.target.closest('#scrim2'))return;
+  if(e.target.closest('#scrim')){closeDrawer();return;}
+  if(e.target.closest('a,select,input,textarea,label,button'))return;
+  var r=e.target.closest('[data-open]');if(r)openDrawer(r.dataset.open);
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){if(modal){closeModal();return;}if(drawerId!==undefined){closeDrawer();return;}}
+  if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.open&&e.target===document.activeElement)openDrawer(e.target.dataset.open);
+});
+document.addEventListener('submit',function(e){
+  e.preventDefault();
+  if(e.target.id==='lf')submitForm();
+  else if(e.target.id==='sf')confirmStage(e.target);
+  else if(e.target.id==='cfgform'){
+    var g={};['new','contacted','meeting','proposal','followup'].forEach(function(k){g[k]=Math.max(0,Number($('#g-'+k).value)||0);});
+    var t={};['new','contacted','meeting','proposal','followup'].forEach(function(k){t[k]=$('#t-'+k).value.trim()||DEFAULT_CFG.templates[k];});
+    $('#main').dataset.dirty='';
+    saveCfg({business:$('#c-biz').value.trim()||DEFAULT_CFG.business,me:$('#c-me').value.trim(),maxAttempts:Math.max(1,Number($('#c-max').value)||3),gaps:g,templates:t,subject:$('#c-sub').value.trim()||DEFAULT_CFG.subject});
+  }
+});
+document.addEventListener('input',function(e){
+  if(e.target.id==='q'){f.q=e.target.value;updateTable();}
+  else if(e.target.id==='m-text')updateSendLinks();
+  else if(e.target.closest&&e.target.closest('#cfgform'))$('#main').dataset.dirty='1';
+});
+document.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='sc-file'){scanPick(t.files&&t.files[0]);return;}
+  if(t.id==='fs'){f.stage=t.value;updateTable();}else if(t.id==='fsrc'){f.source=t.value;updateTable();}else if(t.id==='fsort'){f.sort=t.value;updateTable();}
+  else if(t.dataset&&t.dataset.move){var l=leads.find(function(x){return x.id===t.dataset.move;});if(l&&l.stage!==t.value)stageModal(l.id,t.value);else render();}
+});
+var dragId=null;
+document.addEventListener('dragstart',function(e){var c=e.target.closest&&e.target.closest('.card');if(!c)return;dragId=c.dataset.id;try{e.dataTransfer.setData('text/plain',dragId);e.dataTransfer.effectAllowed='move';}catch(x){}});
+document.addEventListener('dragover',function(e){var c=e.target.closest&&e.target.closest('.col');if(c&&dragId){e.preventDefault();c.classList.add('drop');}});
+document.addEventListener('dragleave',function(e){var c=e.target.closest&&e.target.closest('.col');if(c&&!c.contains(e.relatedTarget))c.classList.remove('drop');});
+document.addEventListener('drop',function(e){var c=e.target.closest&&e.target.closest('.col');if(!c||!dragId)return;e.preventDefault();c.classList.remove('drop');var id=dragId;dragId=null;var l=leads.find(function(x){return x.id===id;});if(l&&l.stage!==c.dataset.stage)stageModal(id,c.dataset.stage);});
+document.addEventListener('dragend',function(){dragId=null;Array.prototype.forEach.call(document.querySelectorAll('.col.drop'),function(c){c.classList.remove('drop');});});
+var VIEWS=['desk','pipeline','leads','dashboard','automation'];
+function route(){var h=location.hash.replace('#','');view=VIEWS.indexOf(h)>=0?h:'desk';$('#main').dataset.dirty='';render();}
+window.addEventListener('hashchange',route);
+view=VIEWS.indexOf(location.hash.replace('#',''))>=0?location.hash.replace('#',''):'desk';
+setStatus('loading');initStore();
+})();
+</script>
+
+</body>
+</html>
